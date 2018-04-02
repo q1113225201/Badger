@@ -3,14 +3,17 @@ package com.sjl.badger;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.content.AsyncQueryHandler;
+import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -35,29 +38,100 @@ public class BadgerUtil {
         }
         badgeCount = Math.min(badgeCount, 99);
         String manufacturer = Build.MANUFACTURER.toLowerCase();
-        if(TextUtils.isEmpty(manufacturer)){
+        if (TextUtils.isEmpty(manufacturer)) {
             return;
         }
         if (manufacturer.contains("vivo")) {
-            badgerVivo(context, badgeCount);
+            badgeVivo(context, badgeCount);
         } else if (manufacturer.contains("huawei")) {
-            badgerHuawei(context, badgeCount);
+            badgeHuawei(context, badgeCount);
         } else if (manufacturer.contains("xiaomi")) {
-            badgerXiaomi(context, badgeCount);
-        }else if (manufacturer.contains("sony")) {
-            badgerSony(context, badgeCount);
+            badgeXiaomi(context, badgeCount);
+        } else if (manufacturer.contains("sony")) {
+            badgeSony(context, badgeCount);
+        } else if (manufacturer.contains("samsung")) {
+            badgeSamsung(context, badgeCount);
+        } else if (manufacturer.contains("zuk")) {
+            badgeZuk(context, badgeCount);
+        } else {
+            badgeDefault(context, badgeCount);
+        }
+    }
+
+    /**
+     * 默认，不一定有效，参考其他开发者写法
+     */
+    private static void badgeDefault(Context context, int badgeCount) {
+        try {
+            Intent intent = new Intent("android.intent.action.BADGE_COUNT_UPDATE");
+            intent.putExtra("badge_count", badgeCount);
+            intent.putExtra("badge_count_package_name", context.getPackageName());
+            intent.putExtra("badge_count_class_name", launcherClassName);
+            context.sendBroadcast(intent);
+        } catch (Exception e) {
+
+        }
+    }
+
+    /**
+     * 联想权限
+     * <uses-permission android:name="android.permission.READ_APP_BADGE"/>
+     */
+    private static void badgeZuk(Context context, int badgeCount) {
+        Bundle extra = new Bundle();
+        extra.putInt("app_badge_count", badgeCount);
+        context.getContentResolver().call(Uri.parse("content://com.android.badge/badge"), "setAppBadgeCount", null, extra);
+    }
+
+    /**
+     * 三星权限
+     * <uses-permission android:name="com.sec.android.provider.badge.permission.READ" />
+     * <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
+     */
+    private static void badgeSamsung(Context context, int badgeCount) {
+        Uri uri = Uri.parse("content://com.sec.badge/apps");
+        String columnId = "_id";
+        String columnPackage = "package";
+        String columnClass = "class";
+        String columnBadgeCount = "badgeCount";
+        Cursor cursor = null;
+        try {
+            ContentResolver contentResolver = context.getContentResolver();
+            cursor = contentResolver.query(uri, new String[]{columnId}, columnPackage + "=?", new String[]{context.getPackageName()}, null);
+
+            if (cursor == null || !cursor.moveToFirst()) {
+                ContentValues contentValues = new ContentValues();
+                contentValues.put(columnPackage, context.getPackageName());
+                contentValues.put(columnClass, launcherClassName);
+                contentValues.put(columnBadgeCount, badgeCount);
+                contentResolver.insert(uri, contentValues);
+            } else {
+                int idColumnIndex = cursor.getColumnIndex(columnId);
+
+                ContentValues contentValues = new ContentValues();
+                contentValues.put(columnBadgeCount, badgeCount);
+                contentResolver.update(uri, contentValues, columnId + "=?", new String[]{String.valueOf(cursor.getInt(idColumnIndex))});
+            }
+        } catch (Exception e) {
+            badgeDefault(context, badgeCount);
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
         }
     }
 
     private static AsyncQueryHandler asyncQueryHandler;
 
     /**
-     索尼权限
-     <uses-permission android:name="com.sonymobile.home.permission.PROVIDER_INSERT_BADGE" />
+     * 索尼权限
+     * <uses-permission android:name="com.sonymobile.home.permission.PROVIDER_INSERT_BADGE" />
+     * <uses-permission android:name="com.sonyericsson.home.permission.BROADCAST_BADGE"/>
      */
-    private static void badgerSony(Context context, int badgeCount) {
+    private static void badgeSony(Context context, int badgeCount) {
         if (asyncQueryHandler == null) {
-            asyncQueryHandler = new AsyncQueryHandler(context.getContentResolver()) {};
+            asyncQueryHandler = new AsyncQueryHandler(context.getContentResolver()) {
+            };
         }
         ContentValues contentValues = new ContentValues();
         contentValues.put("badge_count", badgeCount);
@@ -66,31 +140,45 @@ public class BadgerUtil {
         asyncQueryHandler.startInsert(0, null, Uri.parse("content://com.sonymobile.home.resourceprovider/badge"), contentValues);
     }
 
-    private static void badgerXiaomi(Context context, int badgeCount) {
-        NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        Intent intent = new Intent(Intent.ACTION_MAIN);
-        intent.addCategory(Intent.CATEGORY_HOME);
-        ResolveInfo resolveInfo = context.getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY);
-        Notification.Builder builder = new Notification.Builder(context)
-                .setContentTitle("")
-                .setContentText("")
-                .setSmallIcon(resolveInfo.getIconResource());
-        Notification notification = builder.build();
-        try {
-            Field field = notification.getClass().getDeclaredField("extraNotification");
-            Object extraNotification = field.get(notification);
-            Method method = extraNotification.getClass().getDeclaredMethod("setMessageCount", int.class);
-            method.invoke(extraNotification, badgeCount);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        mNotificationManager.notify(0, notification);
+    /**
+     * 小米
+     */
+    private static void badgeXiaomi(final Context context, final int badgeCount) {
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.addCategory(Intent.CATEGORY_HOME);
+                ResolveInfo resolveInfo = context.getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY);
+                Notification.Builder builder = new Notification.Builder(context)
+                        .setContentTitle("")
+                        .setContentText("")
+                        .setSmallIcon(resolveInfo.getIconResource());
+                Notification notification = builder.build();
+                try {
+                    Field field = notification.getClass().getDeclaredField("extraNotification");
+                    Object extraNotification = field.get(notification);
+                    Method method = extraNotification.getClass().getDeclaredMethod("setMessageCount", int.class);
+                    method.invoke(extraNotification, badgeCount);
+//                    mNotificationManager.notify(0, notification);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    // miui 6之前的版本
+                    Intent localIntent = new Intent("android.intent.action.APPLICATION_MESSAGE_UPDATE");
+                    localIntent.putExtra("android.intent.extra.update_application_component_name", context.getPackageName() + "/" + getLauncherClassName(context));
+                    localIntent.putExtra("android.intent.extra.update_application_message_text", String.valueOf(badgeCount == 0 ? "" : badgeCount));
+                    context.sendBroadcast(localIntent);
+                }
+            }
+        }, 1000);
     }
 
     /**
-     * 据说有用，但在vivo X6S不显示
+     * vivo
+     * 据说有用，但在部分vivo手机上不显示，如x6s
      */
-    private static void badgerVivo(Context context, int badgeCount) {
+    private static void badgeVivo(Context context, int badgeCount) {
         Intent intent = new Intent("launcher.action.CHANGE_APPLICATION_NOTIFICATION_NUM");
         intent.putExtra("packageName", context.getPackageName());
         intent.putExtra("className", launcherClassName);
@@ -99,11 +187,11 @@ public class BadgerUtil {
     }
 
     /**
-     华为权限
-     <uses-permission android:name="android.permission.INTERNET"/>
-     <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE "/>
+     * 华为权限
+     * <uses-permission android:name="android.permission.INTERNET"/>
+     * <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE "/>
      */
-    private static void badgerHuawei(Context context, int badgeCount) {
+    private static void badgeHuawei(Context context, int badgeCount) {
         try {
             Bundle bunlde = new Bundle();
             bunlde.putString("package", context.getPackageName());
@@ -117,7 +205,7 @@ public class BadgerUtil {
 
     private static String launcherClassName;
 
-    public static String getLauncherClassName(Context context) {
+    private static String getLauncherClassName(Context context) {
         if (!TextUtils.isEmpty(launcherClassName)) {
             return launcherClassName;
         }
