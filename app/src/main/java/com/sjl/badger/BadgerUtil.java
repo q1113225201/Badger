@@ -1,6 +1,7 @@
 package com.sjl.badger;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
@@ -10,10 +11,12 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v4.app.NotificationCompat;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -53,6 +56,8 @@ public class BadgerUtil {
             badgeSamsung(context, badgeCount);
         } else if (manufacturer.contains("zuk")) {
             badgeZuk(context, badgeCount);
+        } else if (manufacturer.contains("oppo")) {
+            badgeOppo(context, badgeCount);
         } else {
             badgeDefault(context, badgeCount);
         }
@@ -62,6 +67,23 @@ public class BadgerUtil {
      * 默认，不一定有效，参考其他开发者写法
      */
     private static void badgeDefault(Context context, int badgeCount) {
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O){
+            //8.0之后添加的红点角标
+            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel channel = new NotificationChannel("1","1", NotificationManager.IMPORTANCE_DEFAULT);
+            channel.enableLights(true); //是否在桌面icon右上角展示小红点
+            channel.setLightColor(Color.RED); //小红点颜色
+            notificationManager.createNotificationChannel(channel);
+            Notification notification = new NotificationCompat.Builder(context,"1")
+                    .setContentTitle("新消息")
+                    .setContentText("未完成任务")
+                    .setSmallIcon(R.drawable.ic_launcher_background)
+                    .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
+                    .setNumber(badgeCount)
+                    .build();
+            notificationManager.notify("1",10,notification);
+            return;
+        }
         try {
             Intent intent = new Intent("android.intent.action.BADGE_COUNT_UPDATE");
             intent.putExtra("badge_count", badgeCount);
@@ -69,12 +91,25 @@ public class BadgerUtil {
             intent.putExtra("badge_count_class_name", launcherClassName);
             context.sendBroadcast(intent);
         } catch (Exception e) {
-
+            badgeDefault(context, badgeCount);
         }
     }
 
     /**
-     * 联想权限
+     * QQ反编译获得，实际使用中需要在oppo开发者平台审核通过
+     */
+    private static void badgeOppo(Context context, int badgeCount) {
+        try {
+            Bundle extras = new Bundle();
+            extras.putInt("app_badge_count", badgeCount);
+            context.getContentResolver().call(Uri.parse("content://com.android.badge/badge"), "setAppBadgeCount", null, extras);
+        } catch (Exception e) {
+            badgeDefault(context, badgeCount);
+        }
+    }
+
+    /**
+     * 联想ZUK权限
      * <uses-permission android:name="android.permission.READ_APP_BADGE"/>
      */
     private static void badgeZuk(Context context, int badgeCount) {
@@ -133,11 +168,20 @@ public class BadgerUtil {
             asyncQueryHandler = new AsyncQueryHandler(context.getContentResolver()) {
             };
         }
-        ContentValues contentValues = new ContentValues();
-        contentValues.put("badge_count", badgeCount);
-        contentValues.put("package_name", context.getPackageName());
-        contentValues.put("activity_name", launcherClassName);
-        asyncQueryHandler.startInsert(0, null, Uri.parse("content://com.sonymobile.home.resourceprovider/badge"), contentValues);
+        try {
+            ContentValues contentValues = new ContentValues();
+            contentValues.put("badge_count", badgeCount);
+            contentValues.put("package_name", context.getPackageName());
+            contentValues.put("activity_name", launcherClassName);
+            asyncQueryHandler.startInsert(0, null, Uri.parse("content://com.sonymobile.home.resourceprovider/badge"), contentValues);
+        } catch (Exception e) {
+            Intent intent = new Intent("com.sonyericsson.home.action.UPDATE_BADGE");
+            intent.putExtra("com.sonyericsson.home.intent.extra.badge.SHOW_MESSAGE", badgeCount > 0);
+            intent.putExtra("com.sonyericsson.home.intent.extra.badge.ACTIVITY_NAME", launcherClassName);
+            intent.putExtra("com.sonyericsson.home.intent.extra.badge.MESSAGE", String.valueOf(badgeCount > 0 ? badgeCount : ""));
+            intent.putExtra("com.sonyericsson.home.intent.extra.badge.PACKAGE_NAME", context.getPackageName());
+            context.sendBroadcast(intent);
+        }
     }
 
     /**
@@ -161,7 +205,7 @@ public class BadgerUtil {
                     Object extraNotification = field.get(notification);
                     Method method = extraNotification.getClass().getDeclaredMethod("setMessageCount", int.class);
                     method.invoke(extraNotification, badgeCount);
-//                    mNotificationManager.notify(0, notification);
+                    mNotificationManager.notify(0, notification);
                 } catch (Exception e) {
                     e.printStackTrace();
                     // miui 6之前的版本
