@@ -46,22 +46,22 @@ public class BadgerUtil {
         if (TextUtils.isEmpty(manufacturer)) {
             return;
         }
-        if (manufacturer.contains("vivo")) {
-            badgeVivo(context, badgeCount);
-        } else if (manufacturer.contains("huawei")) {
+        if (manufacturer.contains("huawei")) {
             badgeHuawei(context, badgeCount);
         } else if (manufacturer.contains("xiaomi")) {
             badgeXiaomi(context, badgeCount);
         } else if (manufacturer.contains("sony")) {
             badgeSony(context, badgeCount);
-        } else if (manufacturer.contains("samsung")) {
-            badgeSamsung(context, badgeCount);
         } else if (manufacturer.contains("zuk")) {
             badgeZuk(context, badgeCount);
-        } else if (manufacturer.contains("oppo")) {
-            badgeOppo(context, badgeCount);
+        } else if (manufacturer.contains("samsung")) {
+            badgeSamsung(context, badgeCount);
         } else if (manufacturer.contains("htc")) {
             badgeHtc(context, badgeCount);
+        } else if (manufacturer.contains("vivo")) {
+            badgeVivo(context, badgeCount);
+        } else if (manufacturer.contains("oppo")) {
+            badgeOppo(context, badgeCount);
         } else {
             badgeDefault(context, badgeCount);
         }
@@ -72,8 +72,8 @@ public class BadgerUtil {
      */
     private static void badgeDefault(Context context, int badgeCount) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification notification = getNotification(context, badgeCount);
-            notify(notification, badgeCount);
+            Notification notification = BadgerUtil.getNotification(context, badgeCount);
+            BadgerUtil.notify(notification, badgeCount);
         } else {
             //参考其他开发者写法,不一定有效
             try {
@@ -112,6 +112,9 @@ public class BadgerUtil {
         return notification;
     }
 
+    /**
+     * 发送通知
+     */
     private static void notify(Notification notification, int badgeCount) {
         notificationManager.cancel(TAG, NOTIFY_ID);
         if (badgeCount > 0) {
@@ -203,7 +206,8 @@ public class BadgerUtil {
     /**
      * 索尼权限
      * <uses-permission android:name="com.sonymobile.home.permission.PROVIDER_INSERT_BADGE" />
-     * <uses-permission android:name="com.sonyericsson.home.permission.BROADCAST_BADGE"/>
+     * <uses-permission android:name="com.sonyericsson.home.permission.BROADCAST_BADGE" />
+     * <uses-permission android:name="com.sonyericsson.home.action.UPDATE_BADGE" />
      */
     private static void badgeSony(Context context, int badgeCount) {
         if (asyncQueryHandler == null) {
@@ -211,12 +215,14 @@ public class BadgerUtil {
             };
         }
         try {
+            //官方给出方法
             ContentValues contentValues = new ContentValues();
             contentValues.put("badge_count", badgeCount);
             contentValues.put("package_name", context.getPackageName());
             contentValues.put("activity_name", launcherClassName);
             asyncQueryHandler.startInsert(0, null, Uri.parse("content://com.sonymobile.home.resourceprovider/badge"), contentValues);
         } catch (Exception e) {
+            //网上大部分使用方法
             Intent intent = new Intent("com.sonyericsson.home.action.UPDATE_BADGE");
             intent.putExtra("com.sonyericsson.home.intent.extra.badge.SHOW_MESSAGE", badgeCount > 0);
             intent.putExtra("com.sonyericsson.home.intent.extra.badge.ACTIVITY_NAME", launcherClassName);
@@ -237,7 +243,7 @@ public class BadgerUtil {
             public void run() {
                 //延迟1秒是为了避免执行操作的时候还在app内，如要真正避免还是需要控制调用的时机
                 try {
-                    Notification notification = getNotification(context, badgeCount);
+                    Notification notification = BadgerUtil.getNotification(context, badgeCount);
                     Field field = notification.getClass().getDeclaredField("extraNotification");
                     Object extraNotification = field.get(notification);
                     Method method = extraNotification.getClass().getDeclaredMethod("setMessageCount", int.class);
@@ -245,7 +251,7 @@ public class BadgerUtil {
                     BadgerUtil.notify(notification, badgeCount);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    // miui 6之前的版本
+                    // 网上找的据说是miui 6之前的版本,没有miui6之前版本的小米手机不知道有没有效
                     Intent localIntent = new Intent("android.intent.action.APPLICATION_MESSAGE_UPDATE");
                     localIntent.putExtra("android.intent.extra.update_application_component_name", context.getPackageName() + "/" + getLauncherClassName(context));
                     localIntent.putExtra("android.intent.extra.update_application_message_text", String.valueOf(badgeCount == 0 ? "" : badgeCount));
