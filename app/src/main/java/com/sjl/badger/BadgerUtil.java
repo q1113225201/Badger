@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.AsyncQueryHandler;
+import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
@@ -58,6 +59,8 @@ public class BadgerUtil {
             badgeZuk(context, badgeCount);
         } else if (manufacturer.contains("oppo")) {
             badgeOppo(context, badgeCount);
+        } else if (manufacturer.contains("htc")) {
+            badgeHtc(context, badgeCount);
         } else {
             badgeDefault(context, badgeCount);
         }
@@ -67,21 +70,21 @@ public class BadgerUtil {
      * 默认，不一定有效，参考其他开发者写法
      */
     private static void badgeDefault(Context context, int badgeCount) {
-        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             //8.0之后添加的红点角标
             NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            NotificationChannel channel = new NotificationChannel("1","1", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationChannel channel = new NotificationChannel("1", "1", NotificationManager.IMPORTANCE_DEFAULT);
             channel.enableLights(true); //是否在桌面icon右上角展示小红点
             channel.setLightColor(Color.RED); //小红点颜色
             notificationManager.createNotificationChannel(channel);
-            Notification notification = new NotificationCompat.Builder(context,"1")
-                    .setContentTitle("新消息")
-                    .setContentText("未完成任务")
+            Notification notification = new NotificationCompat.Builder(context, "1")
+                    .setContentTitle("")
+                    .setContentText("")
                     .setSmallIcon(R.drawable.ic_launcher_background)
                     .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                     .setNumber(badgeCount)
                     .build();
-            notificationManager.notify("1",10,notification);
+            notificationManager.notify("1", 10, notification);
             return;
         }
         try {
@@ -93,6 +96,24 @@ public class BadgerUtil {
         } catch (Exception e) {
             badgeDefault(context, badgeCount);
         }
+    }
+
+    /**
+     * HTC权限
+     * <uses-permission android:name="com.htc.launcher.permission.READ_SETTINGS"/>
+     * <uses-permission android:name="com.htc.launcher.permission.WRITE_SETTINGS"/>
+     */
+    private static void badgeHtc(Context context, int badgeCount) {
+        Intent intentNotification = new Intent("com.htc.launcher.action.SET_NOTIFICATION");
+        ComponentName localComponentName = new ComponentName(context.getPackageName(), getLauncherClassName(context));
+        intentNotification.putExtra("com.htc.launcher.extra.COMPONENT", localComponentName.flattenToShortString());
+        intentNotification.putExtra("com.htc.launcher.extra.COUNT", badgeCount);
+        context.sendBroadcast(intentNotification);
+
+        Intent intentShortcut = new Intent("com.htc.launcher.action.UPDATE_SHORTCUT");
+        intentShortcut.putExtra("packagename", context.getPackageName());
+        intentShortcut.putExtra("count", badgeCount);
+        context.sendBroadcast(intentShortcut);
     }
 
     /**
@@ -199,7 +220,10 @@ public class BadgerUtil {
                         .setContentTitle("")
                         .setContentText("")
                         .setSmallIcon(resolveInfo.getIconResource());
-                Notification notification = builder.build();
+                Notification notification = null;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                    notification = builder.build();
+                }
                 try {
                     Field field = notification.getClass().getDeclaredField("extraNotification");
                     Object extraNotification = field.get(notification);
