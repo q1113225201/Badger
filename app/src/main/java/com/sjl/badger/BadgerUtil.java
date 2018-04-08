@@ -40,7 +40,7 @@ public class BadgerUtil {
             Log.e(TAG, "launcherClassName==null");
             return;
         }
-        badgeCount = Math.min(badgeCount, 99);
+        badgeCount = Math.min(Math.abs(badgeCount), 99);
         String manufacturer = Build.MANUFACTURER.toLowerCase();
         if (TextUtils.isEmpty(manufacturer)) {
             return;
@@ -65,26 +65,32 @@ public class BadgerUtil {
             badgeDefault(context, badgeCount);
         }
     }
-
+    private static NotificationManager notificationManager;
     /**
-     * 默认，不一定有效，参考其他开发者写法
+     * 默认，8.0之前不一定有效，参考其他开发者写法
      */
     private static void badgeDefault(Context context, int badgeCount) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            //8.0之后添加的红点角标
-            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            NotificationChannel channel = new NotificationChannel("1", "1", NotificationManager.IMPORTANCE_DEFAULT);
-            channel.enableLights(true); //是否在桌面icon右上角展示小红点
-            channel.setLightColor(Color.RED); //小红点颜色
-            notificationManager.createNotificationChannel(channel);
-            Notification notification = new NotificationCompat.Builder(context, "1")
-                    .setContentTitle("")
-                    .setContentText("")
-                    .setSmallIcon(R.drawable.ic_launcher_background)
+            //8.0之后添加角标
+            if(notificationManager==null) {
+                notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                NotificationChannel channel = new NotificationChannel("badge", "badge", NotificationManager.IMPORTANCE_MIN);
+                channel.setShowBadge(true);
+                notificationManager.createNotificationChannel(channel);
+            }
+            Notification notification = new NotificationCompat.Builder(context, "badge")
+                    .setContentTitle("通知")
+                    .setContentText("新消息")
+                    .setSmallIcon(R.drawable.ic_launcher)
                     .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                     .setNumber(badgeCount)
+                    .setAutoCancel(true)
                     .build();
-            notificationManager.notify("1", 10, notification);
+            if(badgeCount>0) {
+                notificationManager.notify("badge", 10, notification);
+            }else{
+                notificationManager.cancel("badge",10);
+            }
             return;
         }
         try {
@@ -245,6 +251,7 @@ public class BadgerUtil {
     /**
      * vivo
      * 据说有用，但在部分vivo手机上不显示，如x6s
+     * 包名改成QQ或微信的就能显示角标
      */
     private static void badgeVivo(Context context, int badgeCount) {
         Intent intent = new Intent("launcher.action.CHANGE_APPLICATION_NOTIFICATION_NUM");
