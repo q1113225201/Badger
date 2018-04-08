@@ -12,7 +12,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,12 +33,14 @@ import java.util.List;
 
 public class BadgerUtil {
     private static final String TAG = "BadgerUtil";
+    private static final int NOTIFY_ID = 10;
 
     public static void addBadger(Context context, int badgeCount) {
         if (TextUtils.isEmpty(getLauncherClassName(context))) {
             Log.e(TAG, "launcherClassName==null");
             return;
         }
+
         badgeCount = Math.min(Math.abs(badgeCount), 99);
         String manufacturer = Build.MANUFACTURER.toLowerCase();
         if (TextUtils.isEmpty(manufacturer)) {
@@ -65,42 +66,56 @@ public class BadgerUtil {
             badgeDefault(context, badgeCount);
         }
     }
-    private static NotificationManager notificationManager;
+
     /**
-     * 默认，8.0之前不一定有效，参考其他开发者写法
+     * 默认
      */
     private static void badgeDefault(Context context, int badgeCount) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            //8.0之后添加角标
-            if(notificationManager==null) {
-                notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                NotificationChannel channel = new NotificationChannel("badge", "badge", NotificationManager.IMPORTANCE_MIN);
-                channel.setShowBadge(true);
-                notificationManager.createNotificationChannel(channel);
+            Notification notification = getNotification(context, badgeCount);
+            notify(notification, badgeCount);
+        } else {
+            //参考其他开发者写法,不一定有效
+            try {
+                Intent intent = new Intent("android.intent.action.BADGE_COUNT_UPDATE");
+                intent.putExtra("badge_count", badgeCount);
+                intent.putExtra("badge_count_package_name", context.getPackageName());
+                intent.putExtra("badge_count_class_name", launcherClassName);
+                context.sendBroadcast(intent);
+            } catch (Exception e) {
+
             }
-            Notification notification = new NotificationCompat.Builder(context, "badge")
-                    .setContentTitle("通知")
-                    .setContentText("新消息")
-                    .setSmallIcon(R.drawable.ic_launcher)
-                    .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-                    .setNumber(badgeCount)
-                    .setAutoCancel(true)
-                    .build();
-            if(badgeCount>0) {
-                notificationManager.notify("badge", 10, notification);
-            }else{
-                notificationManager.cancel("badge",10);
-            }
-            return;
         }
-        try {
-            Intent intent = new Intent("android.intent.action.BADGE_COUNT_UPDATE");
-            intent.putExtra("badge_count", badgeCount);
-            intent.putExtra("badge_count_package_name", context.getPackageName());
-            intent.putExtra("badge_count_class_name", launcherClassName);
-            context.sendBroadcast(intent);
-        } catch (Exception e) {
-            badgeDefault(context, badgeCount);
+    }
+
+    private static NotificationManager notificationManager;
+
+    private static Notification getNotification(Context context, int badgeCount) {
+        if (notificationManager == null) {
+            notificationManager = ((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                //8.0之后添加角标需要NotificationChannel
+                NotificationChannel channel = new NotificationChannel("badge", "badge", NotificationManager.IMPORTANCE_LOW);
+                channel.setShowBadge(true);
+                ((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
+            }
+        }
+
+        Notification notification = new NotificationCompat.Builder(context, "badge")
+                .setContentTitle("通知")
+                .setContentText("新消息")
+                .setSmallIcon(R.drawable.ic_launcher)
+                .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
+                .setNumber(badgeCount)
+                .setAutoCancel(true)
+                .build();
+        return notification;
+    }
+
+    private static void notify(Notification notification, int badgeCount) {
+        notificationManager.cancel(TAG, NOTIFY_ID);
+        if (badgeCount > 0) {
+            notificationManager.notify(TAG, NOTIFY_ID, notification);
         }
     }
 
@@ -213,29 +228,21 @@ public class BadgerUtil {
 
     /**
      * 小米
+     * 小米手机如果在app内或未清理掉之前通知情况下执行添加角标操作，已显示的角标会消失
+     * 解决方案是清理掉之前发送的通知，并在app退到后台的时候执行添加角标操作
      */
     private static void badgeXiaomi(final Context context, final int badgeCount) {
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                Intent intent = new Intent(Intent.ACTION_MAIN);
-                intent.addCategory(Intent.CATEGORY_HOME);
-                ResolveInfo resolveInfo = context.getPackageManager().resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY);
-                Notification.Builder builder = new Notification.Builder(context)
-                        .setContentTitle("")
-                        .setContentText("")
-                        .setSmallIcon(resolveInfo.getIconResource());
-                Notification notification = null;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    notification = builder.build();
-                }
+                //延迟1秒是为了避免执行操作的时候还在app内，如要真正避免还是需要控制调用的时机
                 try {
+                    Notification notification = getNotification(context, badgeCount);
                     Field field = notification.getClass().getDeclaredField("extraNotification");
                     Object extraNotification = field.get(notification);
                     Method method = extraNotification.getClass().getDeclaredMethod("setMessageCount", int.class);
                     method.invoke(extraNotification, badgeCount);
-                    mNotificationManager.notify(0, notification);
+                    BadgerUtil.notify(notification, badgeCount);
                 } catch (Exception e) {
                     e.printStackTrace();
                     // miui 6之前的版本
