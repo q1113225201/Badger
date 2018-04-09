@@ -17,5 +17,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:onClick="addBadger"
-        android:text="添加角标" />
+        android:text="添加角标（不是前台运行时执行）" />
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="jump"
+        android:text="跳转" />
 </LinearLayout>
