@@ -123,21 +123,18 @@ public class BadgerUtil {
     }
 
     /**
-     * HTC权限
-     * <uses-permission android:name="com.htc.launcher.permission.READ_SETTINGS"/>
-     * <uses-permission android:name="com.htc.launcher.permission.WRITE_SETTINGS"/>
+     * HTC
      */
     private static void badgeHtc(Context context, int badgeCount) {
-        Intent intentNotification = new Intent("com.htc.launcher.action.SET_NOTIFICATION");
-        ComponentName localComponentName = new ComponentName(context.getPackageName(), getLauncherClassName(context));
-        intentNotification.putExtra("com.htc.launcher.extra.COMPONENT", localComponentName.flattenToShortString());
-        intentNotification.putExtra("com.htc.launcher.extra.COUNT", badgeCount);
-        context.sendBroadcast(intentNotification);
+        try {
+            Intent intent = new Intent("android.intent.action.BADGE_COUNT_UPDATE");
+            intent.putExtra("badge_count", badgeCount);
+            intent.putExtra("badge_count_package_name", context.getPackageName());
+            intent.putExtra("badge_count_class_name", launcherClassName);
+            context.sendBroadcast(intent);
+        } catch (Exception e) {
 
-        Intent intentShortcut = new Intent("com.htc.launcher.action.UPDATE_SHORTCUT");
-        intentShortcut.putExtra("packagename", context.getPackageName());
-        intentShortcut.putExtra("count", badgeCount);
-        context.sendBroadcast(intentShortcut);
+        }
     }
 
     /**

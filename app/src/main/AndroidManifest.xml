@@ -14,9 +14,6 @@
     <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
     <!-- 联想ZUK权限 -->
     <uses-permission android:name="android.permission.READ_APP_BADGE" />
-    <!-- HTC权限 -->
-    <uses-permission android:name="com.htc.launcher.permission.READ_SETTINGS" />
-    <uses-permission android:name="com.htc.launcher.permission.WRITE_SETTINGS" />
 
     <uses-permission android:name="android.permission.GET_TASKS"/>
     <application
