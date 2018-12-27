@@ -8,6 +8,7 @@
 <html>
 <font color=#ff0000>注：</font>关于华为文档链接可能失效的问题，到<a href="https://developer.huawei.com/consumer/cn/" >华为开发者页面</a>搜索角标，能找到华为角标开发指南书。
 </html>
+
 #### [小米角标官方文档](https://dev.mi.com/console/doc/detail?pId=939)
 小米做的也挺厚道，在开放平台上搜索就能找到角标的使用，但仍存在两个问题。
 #### [联想ZUK官方文档](http://developer.zuk.com/detail/12)
