@@ -2,7 +2,7 @@
 实现部分Android桌面角标Badge，并提供相关资料链接
 
 ### 相关资料
-#### [华为角标官方文档](http://developer.huawei.com/consumer/cn/devunion/download/badge.pdf)
+#### [华为角标官方文档](https://developer.huawei.com/consumer/cn/devservice/doc/30802)
 华为还是蛮不错的提供了角标的详细使用，但不要忘了添加权限。
 #### [小米角标官方文档](https://dev.mi.com/console/doc/detail?pId=939)
 小米做的也挺厚道，在开放平台上搜索就能找到角标的使用，但仍存在两个问题。
